@@ -1,27 +1,16 @@
 #ifndef GRAPH_H
 #define GRAPH_H
 
-#include "raylib.h"
+#define MAX_NODES 15
+#define INF 999999
 
-typedef struct edge {
-    int dest;
-    int weight;
-    struct edge* next;
-} edge;
-
-typedef struct graph {
-    int node_num;
-    edge** adjacency_list;
-} graph;
-
+// Simple structure for the graph matrix
 typedef struct {
-    graph* g;
-    int source;
-    int destination;
-} graph_load_data;
+    int num_nodes;
+    int weights[MAX_NODES][MAX_NODES];
+} Graph;
 
-graph* create_graph(int node_num);
-void add_edge(graph* g, int src, int dest, int weight);
-void free_graph(graph* g);
+void init_graph(Graph* g, int nodes);
+void add_edge(Graph* g, int src, int dst, int weight);
 
 #endif

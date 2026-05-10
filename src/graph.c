@@ -1,30 +1,18 @@
 #include "graph.h"
-#include <stdlib.h>
 
-graph* create_graph(int node_num) {
-    graph* g = malloc(sizeof(graph));
-    g->node_num = node_num;
-    g->adjacency_list = calloc(node_num, sizeof(edge*));
-    return g;
-}
-
-void add_edge(graph* g, int src, int dest, int weight) {
-    edge* new_node = malloc(sizeof(edge));
-    new_node->dest = dest;
-    new_node->weight = weight;
-    new_node->next = g->adjacency_list[src];
-    g->adjacency_list[src] = new_node;
-}
-
-void free_graph(graph* g) {
-    for (int i = 0; i < g->node_num; i++) {
-        edge* curr = g->adjacency_list[i];
-        while (curr) {
-            edge* temp = curr;
-            curr = curr->next;
-            free(temp);
+// Set all distances to -1 at the start
+void init_graph(Graph* g, int nodes) {
+    g->num_nodes = nodes;
+    for (int i = 0; i < nodes; i++) {
+        for (int j = 0; j < nodes; j++) {
+            g->weights[i][j] = -1;
         }
     }
-    free(g->adjacency_list);
-    free(g);
+}
+
+// Add a new connection between nodes
+void add_edge(Graph* g, int src, int dst, int weight) {
+    if (src >= 0 && src < g->num_nodes && dst >= 0 && dst < g->num_nodes) {
+        g->weights[src][dst] = weight;
+    }
 }
