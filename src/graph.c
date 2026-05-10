@@ -9,11 +9,11 @@ graph* create_graph(int node_num) {
 }
 
 void add_edge(graph* g, int src, int dest, int weight) {
-    edge* new_edge = malloc(sizeof(edge));
-    new_edge->dest = dest;
-    new_edge->weight = weight;
-    new_edge->next = g->adjacency_list[src];
-    g->adjacency_list[src] = new_edge;
+    edge* new_node = malloc(sizeof(edge));
+    new_node->dest = dest;
+    new_node->weight = weight;
+    new_node->next = g->adjacency_list[src];
+    g->adjacency_list[src] = new_node;
 }
 
 void free_graph(graph* g) {
