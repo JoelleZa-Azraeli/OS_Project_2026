@@ -1,5 +1,5 @@
 # OS Project - Graph Traffic Simulation
-**Team:** Bingo Logic
+**Team:** Bingo Logic (yes we have a team name for morale purposes)
 
 ## Partners Information
 * **Partner 1:** Hiba Kljawe 
@@ -11,6 +11,8 @@
 
 ## Repository Link
 [https://github.com/JoelleZa-Azraeli/OS_Project_2026](https://github.com/JoelleZa-Azraeli/OS_Project_2026)
+
+[Watch the Project Demo Video Here](https://drive.google.com/file/d/1mPDqL7iRMkM3oXcwLWfEjXevz5LnptQP/view?usp=drive_link)
 
 ## Project Environment
 * **OS:** Linux (Ubuntu/Debian)
