@@ -6,11 +6,15 @@
 #include "graph_io.h"
 #include "dijkstra.h"
 
-// Timing constants for Milestone 3
-#define PAUSE_TIME 1.0f    // 1 second pause at nodes
-#define STEP_TIME 1.5f     // 1.5 seconds to glide between nodes (Slower)
+// Milestone 3: Timing constants
+#define PAUSE_TIME 1.0f    // 1 second pause at each node
+#define STEP_TIME 0.3f     // 300ms per movement jump
 
-// Function to draw directional arrows (Requirement: Milestone 2)
+// External variables from dijkstra.c to handle dynamic pathing
+extern int final_path[MAX_NODES];
+extern int final_path_count;
+
+// Milestone 2: Function to draw directional arrows for the graph edges
 void DrawArrow(Vector2 start, Vector2 end, Color color) {
     DrawLineV(start, end, color);
     float angle = atan2f(end.y - start.y, end.x - start.x);
@@ -21,23 +25,30 @@ void DrawArrow(Vector2 start, Vector2 end, Color color) {
 }
 
 int main(int argc, char* argv[]) {
+    // Check for required input file argument
     if (argc < 2) {
         printf("Usage: %s <input_file>\n", argv[0]);
         return 1;
     }
 
-    // Load graph data using teammate's logic
+    // Load graph and query data from the text file
     Graph g;
     int startNode, endNode;
-    if (!read_graph_from_file(argv[1], &g, &startNode, &endNode)) return 1;
+    if (!read_graph_from_file(argv[1], &g, &startNode, &endNode)) {
+        printf("Error: Could not read graph file.\n");
+        return 1;
+    }
 
-    // Window setup
+    // Dynamic Logic: Run Dijkstra to populate final_path array
+    find_shortest_path(&g, startNode, endNode);
+
+    // GUI Window Setup
     const int screenWidth = 800;
     const int screenHeight = 600;
-    InitWindow(screenWidth, screenHeight, "Milestone 3: Bingo Logic Simulation");
+    InitWindow(screenWidth, screenHeight, "Bingo Logic - Graph Simulation");
     SetTargetFPS(60);
 
-    // Calculate node positions in a circle
+    // Calculate circular positions for graph nodes
     Vector2 node_pos[MAX_NODES];
     for (int i = 0; i < g.num_nodes; i++) {
         node_pos[i] = (Vector2){
@@ -46,52 +57,64 @@ int main(int argc, char* argv[]) {
         };
     }
 
-    // Animation state
-    // Note: For now we use the path from your test case (0 -> 2 -> 5)
-    int path[] = {0, 2, 5}; 
-    int path_count = 3;
-    Vector2 car_pos = node_pos[path[0]];
-    int current_path_idx = 0;
+    // Animation state variables
+    int current_step = 0;
+    int current_jump = 0; // Tracks the W jumps between nodes
+    Vector2 entity_pos = (final_path_count > 0) ? node_pos[final_path[0]] : (Vector2){0, 0};
     float timer = 0.0f;
     bool moving = false;
     bool is_pausing = true;
+    bool reached = false;
 
+    // Main GUI Loop
     while (!WindowShouldClose()) {
         float dt = GetFrameTime();
 
-        // UI Button logic
-        if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){10, 10, 100, 40})) {
-            if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-                moving = !moving;
+        // Handle Play/Stop button clicks
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            Vector2 mouse = GetMousePosition();
+            if (CheckCollisionPointRec(mouse, (Rectangle){10, 10, 100, 40})) {
+                if (final_path_count > 0) moving = !moving;
             }
         }
 
-        // Milestone 3: Smooth Animation (Lerp) Logic
-        if (moving && current_path_idx < path_count - 1) {
+        // Milestone 3: Animation Engine (Dynamic Path with W Jumps)
+        if (moving && !reached && current_step < final_path_count - 1) {
             timer += dt;
 
             if (is_pausing) {
+                // Mandatory 1-second pause at nodes
                 if (timer >= PAUSE_TIME) {
                     timer = 0;
-                    is_pausing = false; 
+                    is_pausing = false;
                 }
             } else {
-                // Calculate how far we are (0.0 to 1.0)
-                float fraction = timer / STEP_TIME;
-                if (fraction > 1.0f) fraction = 1.0f;
-
-                Vector2 start = node_pos[path[current_path_idx]];
-                Vector2 end = node_pos[path[current_path_idx + 1]];
-
-                // LERP: The "Gliding" math
-                car_pos.x = start.x + (end.x - start.x) * fraction;
-                car_pos.y = start.y + (end.y - start.y) * fraction;
+                // Move in W jumps based on edge weight
+                int u = final_path[current_step];
+                int v = final_path[current_step + 1];
+                int w = g.weights[u][v];
 
                 if (timer >= STEP_TIME) {
                     timer = 0;
-                    current_path_idx++;
-                    car_pos = node_pos[path[current_path_idx]]; // Snap to node
-                    is_pausing = true; 
+                    current_jump++;
+
+                    // Interpolate position based on current jump out of W
+                    Vector2 start_pos = node_pos[u];
+                    Vector2 end_pos = node_pos[v];
+                    entity_pos.x = start_pos.x + (end_pos.x - start_pos.x) * ((float)current_jump / w);
+                    entity_pos.y = start_pos.y + (end_pos.y - start_pos.y) * ((float)current_jump / w);
+
+                    // If we completed all W jumps for this edge
+                    if (current_jump >= w) {
+                        current_step++;
+                        current_jump = 0; // Reset jumps for the next edge
+
+                        if (current_step >= final_path_count - 1) {
+                            reached = true;
+                        } else {
+                            is_pausing = true; // Pause at the new node
+                        }
+                    }
                 }
             }
         }
@@ -99,7 +122,7 @@ int main(int argc, char* argv[]) {
         BeginDrawing();
         ClearBackground(RAYWHITE);
 
-        // Draw edges, arrows, and weights (Milestone 2)
+        // Draw Graph Edges and Weights
         for (int i = 0; i < g.num_nodes; i++) {
             for (int j = 0; j < g.num_nodes; j++) {
                 if (g.weights[i][j] != -1) {
@@ -111,20 +134,25 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        // Draw nodes
+        // Draw Graph Nodes
         for (int i = 0; i < g.num_nodes; i++) {
             DrawCircleV(node_pos[i], 22, DARKBLUE);
             DrawText(TextFormat("%d", i), node_pos[i].x - 6, node_pos[i].y - 8, 20, WHITE);
         }
 
-        // Draw moving entity (The Red Car/Packet)
-        DrawCircleV(car_pos, 12, RED);
+        // Draw the moving entity (red circle)
+        if (final_path_count > 0) {
+            DrawCircleV(entity_pos, 12, RED);
+        } else {
+            DrawText("No Path to Animate", 300, 20, 20, RED);
+        }
 
-        // Control Button
+        // UI: Play/Stop Button
         DrawRectangleRec((Rectangle){10, 10, 100, 40}, moving ? RED : DARKGREEN);
         DrawText(moving ? "STOP" : "PLAY", 35, 20, 20, WHITE);
 
-        if (current_path_idx >= path_count - 1) {
+        // UI: Success Message
+        if (reached) {
             DrawText("DESTINATION REACHED!", 280, 50, 25, DARKGREEN);
         }
 
