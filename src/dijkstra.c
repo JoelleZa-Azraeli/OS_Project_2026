@@ -1,11 +1,15 @@
 #include <stdio.h>
 #include "dijkstra.h"
 
-// Main function to find and print the shortest path
+// Global variables to share the path with main_GUI.c
+int final_path[MAX_NODES];
+int final_path_count = 0;
+
 void find_shortest_path(Graph* g, int start, int end) {
     int dist[MAX_NODES], prev[MAX_NODES], visited[MAX_NODES] = {0};
+    final_path_count = 0; // Reset count for each call
 
-    // Requirement: Check for negative weights (Invalid input)
+    // Check for negative weights (Requirement: Invalid input)
     for(int i=0; i<g->num_nodes; i++) {
         for(int j=0; j<g->num_nodes; j++) {
             if(g->weights[i][j] < -1) {
@@ -18,6 +22,7 @@ void find_shortest_path(Graph* g, int start, int end) {
     // Case: Source equals destination
     if (start == end) {
         printf("%d\n0\n", start);
+        final_path[final_path_count++] = start;
         return;
     }
 
@@ -28,7 +33,7 @@ void find_shortest_path(Graph* g, int start, int end) {
     }
     dist[start] = 0;
 
-    // Dijkstra Algorithm logic
+    // Dijkstra Algorithm Core
     for (int i = 0; i < g->num_nodes; i++) {
         int u = -1;
         for (int j = 0; j < g->num_nodes; j++)
@@ -48,20 +53,26 @@ void find_shortest_path(Graph* g, int start, int end) {
         }
     }
 
-    // Case: No path exists
+    // Output Logic
     if (dist[end] == INF) {
         printf("No path found\n");
     } else {
-        // Print path with arrows
-        int path[MAX_NODES], count = 0, curr = end;
+        // Build the path from back to front
+        int temp_path[MAX_NODES], count = 0, curr = end;
         while (curr != -1) {
-            path[count++] = curr;
+            temp_path[count++] = curr;
             curr = prev[curr];
         }
+
+        // 1. Print result for Milestone 1
         for (int i = count - 1; i >= 0; i--) {
-            printf("%d%s", path[i], (i == 0 ? "" : " -> "));
+            printf("%d%s", temp_path[i], (i == 0 ? "" : " -> "));
         }
-        // Requirement: Print total weight on a new line
         printf("\n%d\n", dist[end]);
+
+        // 2. Fill the global path array for Milestone 3 GUI
+        for (int i = count - 1; i >= 0; i--) {
+            final_path[final_path_count++] = temp_path[i];
+        }
     }
 }
