@@ -10,6 +10,10 @@
   - ID Num: 215037862
   - GitHub: [JoelleZa-Azraeli](https://github.com/JoelleZa-Azraeli)
   - Emails: joellezanbil2911@gmail.com / joelleza@post.jce.ac.il
+* **Partner 3:** Maysa Lahaleh
+  - ID Num: 214003873
+  - GitHub: [mayslah](https://github.com/mayslah)
+  - Emails: mays.lahaleh@gmail.com / lahalehma@post.jce.ac.il
 
 ## Repository Link
 [https://github.com/JoelleZa-Azraeli/OS_Project_2026](https://github.com/JoelleZa-Azraeli/OS_Project_2026)
