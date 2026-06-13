@@ -14,20 +14,27 @@
 #include "travelers.h"
 #include "ipc_types.h"
 
-/* One binary semaphore per node, shared across processes via mmap. */
 typedef struct {
     sem_t node_sems[MAX_NODES];
 } SharedSync;
 
 static Color TRAVELER_COLORS[] = {
-    RED, BLUE, DARKGREEN, PURPLE, ORANGE,
-    PINK, MAROON, LIME, SKYBLUE, VIOLET
+    {220,  80,  80, 255},
+    { 70, 130, 220, 255},
+    { 60, 180,  90, 255},
+    {170,  80, 200, 255},
+    {220, 160,  50, 255},
+    {200,  90, 150, 255},
+    { 80, 190, 190, 255},
+    {210, 130,  60, 255},
+    {100, 160, 220, 255},
+    {140, 100, 200, 255},
 };
 
-static void DrawArrow(Vector2 start, Vector2 end, Color color) {
-    DrawLineV(start, end, color);
+static void DrawArrow(Vector2 start, Vector2 end, Color color, float thick) {
+    DrawLineEx(start, end, thick, color);
     float angle = atan2f(end.y - start.y, end.x - start.x);
-    float sz = 12.0f;
+    float sz = 14.0f;
     Vector2 p1 = { end.x - sz * cosf(angle - PI/6), end.y - sz * sinf(angle - PI/6) };
     Vector2 p2 = { end.x - sz * cosf(angle + PI/6), end.y - sz * sinf(angle + PI/6) };
     DrawTriangle(end, p1, p2, color);
@@ -37,7 +44,7 @@ typedef struct {
     pid_t pid;
     int   read_fd;
     int   current_node;
-    int   waiting_for;  // node being waited on (-1 = not waiting)
+    int   waiting_for;
     bool  finished;
 } TravelerState;
 
@@ -51,14 +58,12 @@ int main(int argc, char* argv[]) {
         printf("Error: Could not read file.\n"); return 1;
     }
 
-    // Allocate shared semaphores (pshared=1 requires MAP_SHARED anonymous memory)
     SharedSync* shared = mmap(NULL, sizeof(SharedSync),
         PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
     if (shared == MAP_FAILED) { perror("mmap"); return 1; }
     for (int i = 0; i < g.num_nodes; i++)
-        sem_init(&shared->node_sems[i], 1, 1); // pshared=1, initial value=1
+        sem_init(&shared->node_sems[i], 1, 1);
 
-    // One pipe per traveler
     int pipes[MAX_TRAVELERS][2];
     for (int i = 0; i < num_travelers; i++) pipe(pipes[i]);
 
@@ -79,24 +84,22 @@ int main(int argc, char* argv[]) {
             msg.pid = getpid();
 
             for (int step = 0; step < path_count; step++) {
-                // Announce waiting before acquiring the node semaphore
                 msg.msg_type  = MSG_WAITING;
                 msg.node      = path[step];
                 msg.next_node = (step < path_count - 1) ? path[step + 1] : -1;
                 write(wfd, &msg, sizeof(msg));
 
-                sem_wait(&shared->node_sems[path[step]]); // acquire node (critical section)
+                sem_wait(&shared->node_sems[path[step]]);
 
-                // Announce arrival inside the node
                 msg.msg_type  = MSG_ARRIVED;
                 write(wfd, &msg, sizeof(msg));
 
-                sleep(1); // stay in node for exactly 1 second
+                sleep(1);
 
-                sem_post(&shared->node_sems[path[step]]); // release node
+                sem_post(&shared->node_sems[path[step]]);
 
                 if (step < path_count - 1)
-                    usleep(g.weights[path[step]][path[step+1]] * 300000); // edge travel
+                    usleep(g.weights[path[step]][path[step+1]] * 300000);
             }
 
             msg.msg_type  = MSG_FINISHED;
@@ -110,7 +113,6 @@ int main(int argc, char* argv[]) {
         close(pipes[i][1]);
     }
 
-    // Non-blocking reads for the parent
     TravelerState states[MAX_TRAVELERS];
     for (int i = 0; i < num_travelers; i++) {
         states[i].pid          = pids[i];
@@ -134,12 +136,10 @@ int main(int argc, char* argv[]) {
         };
     }
 
-    // Fixed offsets to spread waiting travelers around a node visually
-    float wait_offsets_x[] = {-30, 30, -30,  30,  0};
-    float wait_offsets_y[] = {-30,-30,  30, -30, 35};
+    float wait_offsets_x[] = {-35, 35, -35,  35,   0};
+    float wait_offsets_y[] = {-35,-35,  35, -35,  40};
 
     while (!WindowShouldClose()) {
-        // Drain all pipes
         for (int i = 0; i < num_travelers; i++) {
             if (states[i].finished) continue;
             TravelerMsg msg;
@@ -157,7 +157,8 @@ int main(int argc, char* argv[]) {
                 } else if (msg.msg_type == MSG_FINISHED) {
                     printf("[PID=%d] finished\n", msg.pid);
                     fflush(stdout);
-                    states[i].finished = true;
+                    states[i].finished    = true;
+                    states[i].waiting_for = -1;
                     close(states[i].read_fd);
                     break;
                 }
@@ -165,60 +166,70 @@ int main(int argc, char* argv[]) {
         }
 
         BeginDrawing();
-        ClearBackground(RAYWHITE);
+        ClearBackground((Color){245, 245, 250, 255});
 
-        // Edges
         for (int i = 0; i < g.num_nodes; i++)
             for (int j = 0; j < g.num_nodes; j++)
-                if (g.weights[i][j] != -1) {
-                    DrawArrow(node_pos[i], node_pos[j], DARKGRAY);
-                    DrawText(TextFormat("%d", g.weights[i][j]),
-                        (int)((node_pos[i].x + node_pos[j].x) / 2) + 5,
-                        (int)((node_pos[i].y + node_pos[j].y) / 2) + 5, 15, MAROON);
-                }
+                if (g.weights[i][j] != -1)
+                    DrawArrow(node_pos[i], node_pos[j], (Color){160, 160, 175, 255}, 2.5f);
 
-        // Nodes
+        for (int i = 0; i < g.num_nodes; i++)
+            for (int j = 0; j < g.num_nodes; j++)
+                if (g.weights[i][j] != -1)
+                    DrawText(TextFormat("%d", g.weights[i][j]),
+                        (int)((node_pos[i].x + node_pos[j].x) / 2) + 6,
+                        (int)((node_pos[i].y + node_pos[j].y) / 2) + 6,
+                        15, (Color){80, 80, 100, 255});
+
         for (int i = 0; i < g.num_nodes; i++) {
-            DrawCircleV(node_pos[i], 22, DARKBLUE);
-            DrawText(TextFormat("%d", i), (int)node_pos[i].x - 6, (int)node_pos[i].y - 8, 20, WHITE);
+            DrawCircleV(node_pos[i], 22, (Color){50, 70, 120, 255});
+            DrawText(TextFormat("%d", i),
+                (int)node_pos[i].x - 6, (int)node_pos[i].y - 8, 20, WHITE);
         }
 
-        // Travelers: waiting ones drawn in ORANGE outside the node, others at the node
         for (int i = 0; i < num_travelers; i++) {
-            if (states[i].finished) continue;
-
             Color c;
             Vector2 pos;
 
             if (states[i].waiting_for != -1) {
-                // Waiting outside target node — draw in orange with an offset
-                c   = ORANGE;
+                c = (Color){255, 165, 0, 255};
                 int wn = states[i].waiting_for;
                 pos = (Vector2){
                     node_pos[wn].x + wait_offsets_x[i % 5],
                     node_pos[wn].y + wait_offsets_y[i % 5]
                 };
-                // Small "W" indicator
-                DrawText("W", (int)pos.x - 4, (int)pos.y - 16, 12, ORANGE);
             } else {
                 c = TRAVELER_COLORS[i % 10];
                 pos = node_pos[states[i].current_node];
-                pos.x += (float)((i % 3) - 1) * 9;
-                pos.y += (float)(i / 3) * 9;
+                pos.x += (float)((i % 3) - 1) * 10;
+                pos.y += (float)(i / 3) * 10;
             }
 
-            DrawCircleV(pos, 12, c);
-            DrawText(TextFormat("%d", i + 1), (int)pos.x - 4, (int)pos.y - 6, 12, WHITE);
+            DrawCircleV(pos, 13, c);
+            DrawCircleLines((int)pos.x, (int)pos.y, 13, WHITE);
         }
 
-        // Legend
-        DrawText("Orange = waiting outside node", 10, screenHeight - 25, 16, ORANGE);
+        int lx = screenWidth - 190, ly = 10;
+        DrawRectangle(lx - 8, ly - 6, 188, num_travelers * 28 + 40, (Color){230, 230, 240, 220});
+        for (int i = 0; i < num_travelers; i++) {
+            Color c = TRAVELER_COLORS[i % 10];
+            DrawCircle(lx + 8, ly + 10 + i * 28, 9, c);
+            DrawCircleLines(lx + 8, ly + 10 + i * 28, 9, WHITE);
+            DrawText(TextFormat("%d -> %d", travelers[i].src, travelers[i].dst),
+                lx + 22, ly + 3 + i * 28, 18, (Color){30, 30, 30, 255});
+        }
+        int oy = ly + num_travelers * 28 + 8;
+        DrawCircle(lx + 8, oy + 6, 9, (Color){255, 165, 0, 255});
+        DrawCircleLines(lx + 8, oy + 6, 9, WHITE);
+        DrawText("= waiting", lx + 22, oy, 15, (Color){80, 80, 80, 255});
 
         bool all_done = true;
         for (int i = 0; i < num_travelers; i++)
             if (!states[i].finished) { all_done = false; break; }
-        if (all_done)
-            DrawText("ALL TRAVELERS DONE!", 270, 50, 24, DARKGREEN);
+        if (all_done) {
+            DrawText("ALL TRAVELERS DONE!", 255, 45, 24, DARKGREEN);
+            DrawText("Press ESC to close", 285, 75, 18, (Color){100, 100, 100, 255});
+        }
 
         EndDrawing();
     }
