@@ -187,6 +187,7 @@ int main(int argc, char* argv[]) {
                 (int)node_pos[i].x - 6, (int)node_pos[i].y - 8, 20, WHITE);
         }
 
+        /* Travelers — finished ones stay visible at their last node */
         for (int i = 0; i < num_travelers; i++) {
             Color c;
             Vector2 pos;
@@ -209,6 +210,7 @@ int main(int argc, char* argv[]) {
             DrawCircleLines((int)pos.x, (int)pos.y, 13, WHITE);
         }
 
+        /* Top-right legend */
         int lx = screenWidth - 190, ly = 10;
         DrawRectangle(lx - 8, ly - 6, 188, num_travelers * 28 + 40, (Color){230, 230, 240, 220});
         for (int i = 0; i < num_travelers; i++) {
