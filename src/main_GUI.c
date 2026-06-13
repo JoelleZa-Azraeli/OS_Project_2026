@@ -63,7 +63,7 @@ int main(int argc, char* argv[]) {
     Vector2 entity_pos = (final_path_count > 0) ? node_pos[final_path[0]] : (Vector2){0, 0};
     float timer = 0.0f;
     bool moving = false;
-    bool is_pausing = true;
+    bool is_pausing = false;
     bool reached = false;
 
     // Main GUI Loop
