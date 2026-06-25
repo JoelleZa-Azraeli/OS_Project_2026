@@ -47,7 +47,13 @@ milestone6:
 	$(CC) $(CFLAGS2) src/main_m6.c $(CORE_SRC) $(INC) $(LDFLAGS) -o sim $(LIBS)
 
 # ------------------------------------------------------------------
+# Milestone 7: scheduling algorithms (FCFS / SJF)  ->  ./sim -schd <fcfs|sjf> <file>
+# ------------------------------------------------------------------
+milestone7:
+	$(CC) $(CFLAGS2) src/main_m7.c $(CORE_SRC) $(INC) $(LDFLAGS) -o sim $(LIBS)
+
+# ------------------------------------------------------------------
 clean:
 	rm -f dijkstra sim *.o
 
-.PHONY: milestone1 milestone2 milestone3 milestone4 milestone5 milestone6 clean
+.PHONY: milestone1 milestone2 milestone3 milestone4 milestone5 milestone6 milestone7 clean
