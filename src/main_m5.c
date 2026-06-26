@@ -37,6 +37,7 @@ static void DrawArrow(Vector2 start, Vector2 end, Color color, float thick) {
 typedef struct {
     pid_t pid;
     int   read_fd;
+    int   ack_wfd;
     int   current_node;
     bool  finished;
 } TravelerState;
@@ -54,6 +55,10 @@ int main(int argc, char* argv[]) {
     int pipes[MAX_TRAVELERS][2];
     for (int i = 0; i < num_travelers; i++) pipe(pipes[i]);
 
+    // ack_pipes: reverse direction (parent -> child), used to send approval back to child
+    int ack_pipes[MAX_TRAVELERS][2];
+    for (int i = 0; i < num_travelers; i++) pipe(ack_pipes[i]);
+
     pid_t pids[MAX_TRAVELERS];
     for (int i = 0; i < num_travelers; i++) {
         pid_t pid = fork();
@@ -61,8 +66,11 @@ int main(int argc, char* argv[]) {
             for (int j = 0; j < num_travelers; j++) {
                 close(pipes[j][0]);
                 if (j != i) close(pipes[j][1]);
+                close(ack_pipes[j][1]);           // child never writes to ack_pipes
+                if (j != i) close(ack_pipes[j][0]); // child only reads its own ack pipe
             }
             int wfd = pipes[i][1];
+            int ack_rfd = ack_pipes[i][0]; // child reads parent approval from here
 
             int path[MAX_NODES];
             int path_count = compute_path(&g, travelers[i].src, travelers[i].dst, path);
@@ -74,7 +82,11 @@ int main(int argc, char* argv[]) {
                 msg.msg_type  = MSG_ARRIVED;
                 msg.node      = path[step];
                 msg.next_node = (step < path_count - 1) ? path[step + 1] : -1;
-                write(wfd, &msg, sizeof(msg));
+                write(wfd, &msg, sizeof(msg)); // notify parent: I arrived at this node
+
+                // wait for parent approval before moving to next node
+                int ack;
+                read(ack_rfd, &ack, sizeof(ack));
 
                 if (step < path_count - 1) {
                     sleep(1);
@@ -91,12 +103,14 @@ int main(int argc, char* argv[]) {
         }
         pids[i] = pid;
         close(pipes[i][1]);
+        close(ack_pipes[i][0]); // parent only writes to ack_pipes, close the read end
     }
 
     TravelerState states[MAX_TRAVELERS];
     for (int i = 0; i < num_travelers; i++) {
         states[i].pid          = pids[i];
         states[i].read_fd      = pipes[i][0];
+        states[i].ack_wfd      = ack_pipes[i][1]; // parent writes ACK here to unblock child
         states[i].current_node = travelers[i].src;
         states[i].finished     = false;
         fcntl(pipes[i][0], F_SETFL, O_NONBLOCK);
@@ -128,6 +142,9 @@ int main(int argc, char* argv[]) {
                     else
                         printf("[PID=%d] arrived at node %d | next node: %d\n", msg.pid, msg.node, msg.next_node);
                     fflush(stdout);
+                    // send approval: child can now move to the next node
+                    int ack = 1;
+                    write(states[i].ack_wfd, &ack, sizeof(ack));
                 } else if (msg.msg_type == MSG_FINISHED) {
                     printf("[PID=%d] finished\n", msg.pid);
                     fflush(stdout);
