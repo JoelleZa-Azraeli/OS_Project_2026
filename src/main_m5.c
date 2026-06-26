@@ -70,6 +70,18 @@ int main(int argc, char* argv[]) {
             TravelerMsg msg;
             msg.pid = getpid();
 
+            if (path_count <= 0) {
+                msg.msg_type  = MSG_ARRIVED;
+                msg.node      = travelers[i].src;
+                msg.next_node = -999;
+                write(wfd, &msg, sizeof(msg));
+
+                msg.msg_type  = MSG_FINISHED;
+                write(wfd, &msg, sizeof(msg));
+                close(wfd);
+                exit(0);
+            }
+
             for (int step = 0; step < path_count; step++) {
                 msg.msg_type  = MSG_ARRIVED;
                 msg.node      = path[step];
@@ -123,7 +135,9 @@ int main(int argc, char* argv[]) {
             while (read(states[i].read_fd, &msg, sizeof(msg)) == (ssize_t)sizeof(msg)) {
                 if (msg.msg_type == MSG_ARRIVED) {
                     states[i].current_node = msg.node;
-                    if (msg.next_node == -1)
+                    if (msg.next_node == -999) {
+                        printf("[PID=%d] SPECIAL ERROR: GRAPH NOT CONNECTED - NO ROUTE AVAILABLE FROM NODE %d!\n", msg.pid, msg.node);
+                    } else if (msg.next_node == -1)
                         printf("[PID=%d] arrived at node %d | DESTINATION\n", msg.pid, msg.node);
                     else
                         printf("[PID=%d] arrived at node %d | next node: %d\n", msg.pid, msg.node, msg.next_node);
